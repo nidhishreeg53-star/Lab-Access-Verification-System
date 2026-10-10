@@ -1,0 +1,43 @@
+name: Build C++ to WebAssembly and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Compile access_tree.cpp to WebAssembly
+        run: |
+          mkdir -p site
+          emcc access_tree.cpp -O2 -std=c++17 -o site/tree.js \
+            -s MODULARIZE=1 -s EXPORT_NAME=createTree \
+            -s EXPORTED_RUNTIME_METHODS='["cwrap"]' \
+            -s EXPORTED_FUNCTIONS='["_av_init","_av_request","_av_queue_size","_av_lookup","_av_process_next","_av_toggle_lock","_av_add","_av_revoke","_av_perm","_av_remove","_av_state","_av_tree"]'
+          cp index.html site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
